@@ -5,13 +5,13 @@ Currently its a minimal os built out of curiosity which just prints "hi" on the 
 ## Project Structure
 
 osdev/
-├── src/ # Source files
-│ ├── boot.S
-│ ├── kernel.c
-│ └── linker.ld
-├── iso/ # GRUB ISO folder
-├── build/ # Compiled objects & binaries (ignored in Git)
-└── README.md
+src/ # Source files
+│boot.S
+│kernel.c
+│linker.ld
+├─iso/ # GRUB ISO folder
+├build/ # Compiled objects & binaries (ignored in Git)
+└README.md
 
 
 ---
