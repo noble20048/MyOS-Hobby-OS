@@ -3,16 +3,16 @@ MyOS is a 32-bit multiboot hobby OS built with i686-elf GCC and GRUB.
 
 Currently its a minimal os built out of curiosity which just prints "hi" on the screen and boots using grub via Qemu
 ## Project Structure
-
-osdev-
-src/ # Source files
-boot.S
-kernel.c
-linker.ld
-iso/ # GRUB ISO folder
-├build/ # Compiled objects & binaries (ignored in Git)
-README.md
-
+```
+osdev-/
+  src/                # Source files
+    boot.S           # Boot assembly code
+    kernel.c         # Kernel implementation
+    linker.ld        # Linker script
+  iso/                # GRUB ISO folder
+  build/              # Compiled objects & binaries (ignored in Git)
+  README.md
+```
 
 ---
 
