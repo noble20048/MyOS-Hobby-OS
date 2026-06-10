@@ -1,0 +1,6 @@
+build/
+*.iso
+*.o
+*.elf
+qemu-monitor.sock
+iso/boot/kernel.elf
