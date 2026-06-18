@@ -53,6 +53,12 @@ void terminal_putchar(char c) {
             terminal_row = VGA_HEIGHT - 1;
         }
         return;
+    } else if (c == '\b') {
+        if (terminal_column > 0) {
+            terminal_column--;
+            terminal_putentryat(' ', terminal_color, terminal_column, terminal_row);
+        }
+        return;
     }
 
     terminal_putentryat(c, terminal_color, terminal_column, terminal_row);

@@ -1,4 +1,32 @@
 #include "vga.h"
+#include "fs.h"
+
+// Command buffer to store what the user is typing
+char buffer[256];
+int buffer_index = 0;
+
+// This function processes the command after Enter is pressed
+void shell_execute(char* cmd) {
+    if (str_compare(cmd, "help") == 0) {
+        terminal_writestring("Commands: help, ls, cat <file>, clear, vibe\n");
+    } else if (str_compare(cmd, "ls") == 0) {
+        fs_list();
+    } else if (str_compare(cmd, "clear") == 0) {
+        terminal_clear();
+    } else if (cmd[0] == 'c' && cmd[1] == 'a' && cmd[2] == 't' && cmd[3] == ' ') {
+        // Simple parser for "cat filename"
+        fs_read(cmd + 4); 
+    } else if (str_compare(cmd, "vibe") == 0) {
+        terminal_writestring("System Check: Vibes are optimal.\n");
+    } else if (cmd[0] != 0) {
+        terminal_writestring("Unknown command: ");
+        terminal_writestring(cmd);
+        terminal_writestring("\n");
+    }
+    
+    // Print the prompt again
+    terminal_writestring("MyOS> ");
+}
 
 // Read a byte from a hardware port
 static inline unsigned char inb(unsigned short port) {
@@ -15,8 +43,8 @@ unsigned char kbd_us[128] = {
   't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n',	/* Enter key */
     0,			/* 29   - Control */
   'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';',	/* 39 */
- '\'', '`',   0,		/* Left shift */
- '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.',	/* 49 */
+  '\'', '`',   0,		/* Left shift */
+  '\\', 'z', 'x', 'c', 'v', 'b', 'n', 'm', ',', '.',	/* 49 */
   '/',   0,				/* Right shift */
   '*',
     0,	/* Alt */
@@ -25,6 +53,7 @@ unsigned char kbd_us[128] = {
 
 void kernel_main(void) {
     terminal_initialize();
+    fs_init();
 
     // The "Vibe" Boot Splash
     terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
@@ -38,34 +67,47 @@ void kernel_main(void) {
     terminal_writestring("         |___/                \n\n");
 
     terminal_setcolor(vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK));
-    terminal_writestring("[ OK ] Kernel initialized.\n");
-    terminal_writestring("[ OK ] Keyboard driver (polling) ready.\n");
-    terminal_writestring("[ INFO ] Type something to test the vibes...\n\n");
+    terminal_writestring("[ OK ] MyOS Vibe Edition - Terminal Ready\n");
+    terminal_writestring("Type 'help' to begin.\n\n");
     
     // Reset color for user input
     terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+    terminal_writestring("MyOS> ");
 
     while(1) {
         if (inb(0x64) & 1) {
             unsigned char scancode = inb(0x60);
-            if (scancode & 0x80) continue;
+            if (scancode & 0x80) continue; // Ignore key release
 
-            char c = kbd_us[scancode];
-            
-            // The Vibe Controller
-            if (scancode == 0x3B) {        // F1
+            if (scancode == 0x3E) { // F4 Key (File Manager Button)
+                terminal_clear();
                 terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
-                terminal_writestring("\n[ VIBE ] Electric Blue Mode!\n");
-            } else if (scancode == 0x3C) { // F2
-                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK));
-                terminal_writestring("\n[ VIBE ] Pink Vibes!\n");
-            } else if (scancode == 0x3D) { // F3
-                terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK));
-                terminal_writestring("\n[ VIBE ] Hacker Red Mode!\n");
-            } else if (c != 0) {
-                terminal_putchar(c);
+                terminal_writestring("--- [ QUICK FILE BROWSER ] ---\n");
+                fs_list();
+                terminal_writestring("------------------------------\n");
+                terminal_setcolor(vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK));
+                terminal_writestring("MyOS> ");
+                buffer_index = 0; 
+                continue;
             }
 
+            if (scancode == 0x1C) { // ENTER KEY
+                terminal_putchar('\n');
+                buffer[buffer_index] = '\0'; // End the string
+                shell_execute(buffer);       // Run the command
+                buffer_index = 0;            // Reset buffer
+            } else if (scancode == 0x0E) { // BACKSPACE
+                if (buffer_index > 0) {
+                    buffer_index--;
+                    terminal_putchar('\b'); 
+                }
+            } else {
+                char c = kbd_us[scancode];
+                if (c != 0 && buffer_index < 255) {
+                    buffer[buffer_index++] = c;
+                    terminal_putchar(c);
+                }
+            }
         }
     }
 }
