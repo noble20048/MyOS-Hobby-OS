@@ -19,6 +19,9 @@ typedef struct {
 void fs_init();
 void fs_list();
 int fs_read(const char* name);
+void fs_create(const char* name);
+void fs_write(const char* name, const char* content);
+void fs_delete(const char* name);
 int str_compare(const char* s1, const char* s2);
 
 #endif
