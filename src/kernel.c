@@ -1,6 +1,8 @@
 #include "fs.h"
 #include "vga.h"
-
+void show_time();
+void itoa(int n, char *s);
+void terminal_print_int(int n);
 // Command buffer to store what the user is typing
 char buffer[256];
 int buffer_index = 0;
@@ -9,11 +11,13 @@ int buffer_index = 0;
 void shell_execute(char *cmd) {
   if (str_compare(cmd, "help") == 0) {
     terminal_writestring("Commands: help, ls, cat <file>, touch <file>, write "
-                         "<file> <text>, rm <file>, clear, vibe, whoami\n");
+                         "<file> <text>, rm <file>, clear, vibe, whoami, time\n");
   } else if (str_compare(cmd, "ls") == 0) {
     fs_list();
   } else if (str_compare(cmd, "clear") == 0) {
     terminal_clear();
+  } else if (str_compare(cmd, "time") == 0) {
+    show_time();
   } else if (cmd[0] == 'c' && cmd[1] == 'a' && cmd[2] == 't' && cmd[3] == ' ') {
     // Simple parser for "cat filename"
     fs_read(cmd + 4);
@@ -35,6 +39,7 @@ void shell_execute(char *cmd) {
         break;
       }
     }
+
     if (content) {
       fs_write(filename, content);
     } else {
@@ -61,6 +66,53 @@ static inline unsigned char inb(unsigned short port) {
   __asm__ __volatile__("inb %1, %0" : "=a"(ret) : "Nd"(port));
   return ret;
 }
+static inline void outb(unsigned short port, unsigned char val) {
+  __asm__ __volatile__("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+// convert an integer to a string (very basic method)
+void itoa(int n, char *s) {
+  int i, sign;
+  if ((sign = n) < 0)
+    n = -n;
+  i = 0;
+  do {
+    s[i++] = n % 10 + '0';
+  } while ((n /= 10) > 0);
+  if (sign < 0)
+    s[i++] = '-';
+  s[i] = '\0';
+  // reverse string
+  for (int j = 0, k = i - 1; j < k; j++, k--) {
+    char temp = s[j];
+    s[j] = s[k];
+    s[k] = temp;
+  }
+}
+
+int bcd_to_bin(int bcd) { return ((bcd / 16) * 10) + (bcd % 16); }
+
+void terminal_print_int(int n) {
+  char str[16];
+  itoa(n, str);
+  terminal_writestring(str);
+}
+
+void show_time() {
+  // 0x70 is the address port, 0x71 is the data port
+  outb(0x70, 0x04); // Register 0x04 is Hours
+  int hours = bcd_to_bin(inb(0x71));
+
+  outb(0x70, 0x02); // Register 0x02 is Minutes
+  int mins = bcd_to_bin(inb(0x71));
+
+  terminal_writestring("Current Time (UTC): ");
+  terminal_print_int(hours);
+  terminal_writestring(":");
+  if (mins < 10)
+    terminal_writestring("0"); // Leading zero
+  terminal_print_int(mins);
+  terminal_writestring("\n");
+}
 
 unsigned char kbd_us[128] = {
     0,    27,  '1', '2', '3',  '4', '5', '6', '7',  '8', /* 9 */
@@ -84,22 +136,27 @@ void kernel_main(void) {
   // The "Enhanced" Boot Splash
   terminal_clear();
   terminal_setcolor(vga_entry_color(VGA_COLOR_MAGENTA, VGA_COLOR_BLACK));
-  terminal_writestring("--------------------------------------------------------------------------------\n");
+  terminal_writestring("-------------------------------------------------------"
+                       "-------------------------\n");
   terminal_setcolor(vga_entry_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK));
-  terminal_writestring("   __  __         ____   _____    [ VIBE EDITION - v1.2 ]\n");
-  terminal_writestring("  |  \\/  |       / __ \\ / ____|   -----------------------\n");
-  terminal_writestring("  | \\  / |_   _ | |  | | (___     Status: VIBES OPTIMAL\n");
+  terminal_writestring(
+      "   __  __         ____   _____    [ VIBE EDITION - v1.2 ]\n");
+  terminal_writestring(
+      "  |  \\/  |       / __ \\ / ____|   -----------------------\n");
+  terminal_writestring(
+      "  | \\  / |_   _ | |  | | (___     Status: VIBES OPTIMAL\n");
   terminal_writestring("  | |\\/| | | | || |  | |\\___ \\    System: ACTIVE\n");
   terminal_writestring("  | |  | | |_| || |__| |____) |   User:   NOBLE\n");
   terminal_writestring("  |_|  |_|\\__, | \\____/|_____/    \n");
   terminal_writestring("           __/ |                  \n");
   terminal_writestring("          |___/                   \n");
   terminal_setcolor(vga_entry_color(VGA_COLOR_MAGENTA, VGA_COLOR_BLACK));
-  terminal_writestring("--------------------------------------------------------------------------------\n\n");
+  terminal_writestring("-------------------------------------------------------"
+                       "-------------------------\n\n");
 
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK));
   terminal_writestring("Welcome back, Noble. Type 'help' to explore.\n\n");
-  
+
   // Reset color for user input
   terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
   terminal_writestring("[Noble@MyOS]");
@@ -119,9 +176,11 @@ void kernel_main(void) {
         terminal_writestring("--- [ QUICK FILE BROWSER ] ---\n");
         fs_list();
         terminal_writestring("------------------------------\n");
-        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
+        terminal_setcolor(
+            vga_entry_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK));
         terminal_writestring("[Noble@MyOS]");
-        terminal_setcolor(vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
+        terminal_setcolor(
+            vga_entry_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK));
         terminal_writestring(" ~> ");
         buffer_index = 0;
         continue;
