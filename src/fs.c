@@ -1,5 +1,6 @@
 #include "fs.h"
 #include "vga.h"
+#include "ata.h"
 
 // Our "Hard Drive" in RAM
 File files[MAX_FILES];
@@ -114,6 +115,7 @@ void fs_create(const char *name) {
       terminal_writestring("Created file: ");
       terminal_writestring(name);
       terminal_writestring("\n");
+      fs_save_to_disk(); // Auto-save filesystem changes to virtual hard disk
       return;
     }
   }
@@ -135,6 +137,7 @@ void fs_write(const char *name, const char *content) {
       terminal_writestring("Saved data to: ");
       terminal_writestring(name);
       terminal_writestring("\n");
+      fs_save_to_disk(); // Auto-save filesystem changes to virtual hard disk
       return;
     }
   }
@@ -150,8 +153,84 @@ void fs_delete(const char *name) {
       terminal_writestring("Deleted file: ");
       terminal_writestring(name);
       terminal_writestring("\n");
+      fs_save_to_disk(); // Auto-save filesystem changes to virtual hard disk
       return;
     }
   }
   terminal_writestring("Error: File not found!\n");
+}
+
+// Load files from the hard disk
+void fs_load_from_disk(void) {
+  uint16_t sector_buf[256];
+  
+  // Sector 0 contains the File System Magic Number (0x4D594F53 = "MYOS")
+  ata_read_sector(0, sector_buf);
+  uint32_t magic = (uint32_t)sector_buf[0] | ((uint32_t)sector_buf[1] << 16);
+  
+  if (magic == 0x4D594F53) {
+    // Magic matches! Read sectors 1 to 34 sequentially into the files array.
+    uint8_t *dest = (uint8_t*)files;
+    uint32_t bytes_to_read = sizeof(files);
+    uint32_t current_lba = 1;
+    
+    while (bytes_to_read > 0) {
+      ata_read_sector(current_lba, sector_buf);
+      uint32_t chunk = (bytes_to_read > 512) ? 512 : bytes_to_read;
+      
+      uint8_t *src = (uint8_t*)sector_buf;
+      for (uint32_t i = 0; i < chunk; i++) {
+        dest[i] = src[i];
+      }
+      
+      dest += chunk;
+      bytes_to_read -= chunk;
+      current_lba++;
+    }
+    terminal_writestring("Disk storage detected. Loaded filesystem.\n");
+  } else {
+    // Disk uninitialized or magic check failed. 
+    // Format the disk with defaults.
+    terminal_writestring("Hard drive uninitialized. Formatting storage...\n");
+    fs_init();
+    fs_save_to_disk();
+  }
+}
+
+// Save files to the hard disk
+void fs_save_to_disk(void) {
+  uint16_t sector_buf[256];
+  
+  // Prepare sector 0 with the filesystem magic number
+  for (int i = 0; i < 256; i++) {
+    sector_buf[i] = 0;
+  }
+  sector_buf[0] = 0x4F53; // "SO" in little endian
+  sector_buf[1] = 0x4D59; // "MY" in little endian
+  ata_write_sector(0, sector_buf);
+  
+  // Write the files array to sectors 1 to 34
+  uint8_t *src = (uint8_t*)files;
+  uint32_t bytes_to_write = sizeof(files);
+  uint32_t current_lba = 1;
+  
+  while (bytes_to_write > 0) {
+    uint32_t chunk = (bytes_to_write > 512) ? 512 : bytes_to_write;
+    
+    // Zero-initialize the temporary sector buffer
+    uint8_t *dest = (uint8_t*)sector_buf;
+    for (uint32_t i = 0; i < 512; i++) {
+      dest[i] = 0;
+    }
+    // Copy the files chunk data into the sector buffer
+    for (uint32_t i = 0; i < chunk; i++) {
+      dest[i] = src[i];
+    }
+    
+    ata_write_sector(current_lba, sector_buf);
+    
+    src += chunk;
+    bytes_to_write -= chunk;
+    current_lba++;
+  }
 }
